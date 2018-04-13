@@ -1,38 +1,33 @@
 # OpenGL Canvas
 
-# [English README](https://github.com/ChillingVan/android-openGL-canvas/blob/master/README-en.md) 
 
-此项目灵感来源: 
-* Android package com.android.gallery3d.glrenderer 下的源代码
+Idea from: 
+* Codes of Android source code under package com.android.gallery3d.glrenderer
 * [GPUImage](https://github.com/CyberAgent/android-gpuimage)
 * [grafika](https://github.com/google/grafika)
+Thanks to them!
 
-感谢这些源代码提供者！
-
-项目应用
+Used by:
 * [AndroidInstantVideo](https://github.com/ChillingVan/AndroidInstantVideo)
 
+## Features
+* The canvasGL provides similar API as android canvas. And there are GLViews that can be extended to custom your own view to draw things with OpenGL.
+* Similar to the filters of GPUImage, you can apply the filter to the bitmap draw into the GLViews. 
+* Provides GLViews that using GLSurfaceView and TextureView. 
 
-## 功能
-* 提供一个类似Android Canvas类的使用OpenGL来实现绘制的canvasGL。可以像传统自定义View那样直接继承 GLViews, 再使用这个canvas绘制需要的东西。
-* 提供类似 GPUImage 里的Filter的API，可以在使用canvasGL画东西时实现图像处理。
-* 提供的View是继承 GLSurfaceView 或 TextureView 的，可以使用这两种View的特性，特别是TextureView的特性。
-
-* 另外,因为使用OpenGL在另一线程渲染，所以里面的 GLContinuousView 还提供能够实现高性能的动画的方法。
+* The GLContinuousView can provide high performance continuous rendering animation because it uses openGL to draw in its own thread.
 ![anim](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/anim-activity-example.png)
 
+Compare to GPUImage:
+* Provide the continuous rendering Thread in GLContinuousView and GLContinuousTextureView.
+* Using TextureView has this benefit:
+    TextureView does not create a separate window but behaves as a regular View. This key difference allows a TextureView to be moved, transformed, animated, etc. For instance, you can make a TextureView semi-translucent by calling myView.setAlpha(0.5f)
+* Canvas is provided. Not only the image processing but drawing thing what you want.
 
-与GPUImage对比：
-* 提供无限循环渲染线程的 GLContinuousView 和 GLContinuousTextureView。
-* 使用TextureView来实现OpenGL的绘制，可以利用TextureView的优点--TextureView 不会创建一个分离的window，而是像一个普通的view那样显示， 这样就不会像GLSurfaceView那样，要么在所有View上方，要么被其它View遮住(看 setZOrderOnTop(boolean) 的说明)。而且像myView.setAlpha(0.5f)这种方法调用后也会有效果了。 
-* 提供一个canvas，不只是图片处理，可以画上想画的其它东西。
+## Requirements
+* Android API 14 or higher (OpenGL ES 2.0)
 
-
-
-## 使用要求
-* Android API 14 以上(OpenGL ES 2.0 以上)
-
-## 用法
+## Usage
 
 ### Gradle dependency
 
@@ -52,9 +47,9 @@ dependencies {
 }
 ```
 
-### 样例代码 
+### Sample Code
 
-* 自定义一个View.
+* Custom your view.
 ```java
 public class MyGLView extends GLView {
 
@@ -77,10 +72,10 @@ public class MyGLView extends GLView {
 
 ![canvas](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/canvas-example-v1.png)
 
-* 其中, GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLSurfaceTextureProducerView and GLSharedContextView 用法相似.
+* The Usage of GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLSurfaceTextureProducerView and GLSharedContextView is similar.
 
 
-* 使用CanvasGL实现绘制
+* Using canvas to draw
 ```java
         canvas.drawBitmap(textBitmap, left, top);
         
@@ -103,33 +98,28 @@ public class MyGLView extends GLView {
 ![filters](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/filter_example-v1.png)
 
 
-* 可以与Camera结合，注意运行样例代码的时候尽量使用真机而不是模拟器。
+* And can be used with camera, just run the camera sample code on a real device(not in emulator) to see what will happen.
+
 ![camera](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/camera-example-v1.jpg)
 
-* 如果不想使用View，可以使用 OffScreenCanvas 实现脱离屏幕的绘制，然后使用getDrawingBitmap方法获取绘制的内容。
 
+* If you do not want to use GLView, you can use OffScreenCanvas to draw things and fetch it by getDrawingBitmap.
 
 * MediaPlayer
 
-可以用 MediaPlayer 去解码视频，并绘制到 TextureView 上。
-如果用本项目里的 GLSurfaceTextureProducerView ，那么还可以做视频处理。
-结合[AndroidInstantVideo](https://github.com/ChillingVan/AndroidInstantVideo)的stream publisher，就能生成新视频。
+You can use MediaPlayer to decode video and draw it on the TextureView. 
+If you use GLSurfaceTextureProducerView, then you can process the video frames and provide the texture to MediaCodec to create a new Video. 
+Use this sample and the stream publisher sample of [AndroidInstantVideo](https://github.com/ChillingVan/AndroidInstantVideo). You can implement this.
 
+* See the wiki page for more use case.[here](https://github.com/ChillingVan/android-openGL-canvas/wiki)
 
-* [更多用例请查看wiki](https://github.com/ChillingVan/android-openGL-canvas/wiki)
+## Notice
+* The onGLDraw method in GLView runs in its own thread but not the main thread. 
+* I haven't implemented all the filters in GPUImage. I will add more later. If you need, you can take my code as example to implement your filter. It is simple.
+* Remember to call onResume and onPause in the Activity lifecycle when using GLContinuousView and GLContinuousTextureView.
 
-## 注意事项
-* 每一个View的onGLDraw都运行在自己的线程而非主线程。
-* 目前的Filter没有GPUImage里那么多，后续会陆续增加，如果有需要，参照我的代码自己实现即可，难度不高。
-
-## 相关博客文章
-* [OpenGL绘制一张图片的流程](http://www.jianshu.com/p/40521c92ef85)
-* [如何封装 opengl 流程](http://www.jianshu.com/p/c45d11627c70)
-* [代替GLSurfaceView的GLTextureView](http://www.jianshu.com/p/5a127d43b39a)
-
-
-## 最近更新
-* 修复在GLProducedTextureView尺寸改变时重复创建producedTexture
+## Latest Update
+* Fix issue that recreate for producedTexture of GLProducedTextureView.
 
 ## License
     Copyright 2016 ChillingVan.
@@ -145,3 +135,11 @@ public class MyGLView extends GLView {
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
+### Donate
+Thanks for your support !!!
+![alipay](http://upload-images.jianshu.io/upload_images/3587192-1cc20071ce4a042a.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+alipay
+![wechat pay](http://upload-images.jianshu.io/upload_images/3587192-3289f8237d98b2c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+wechat pay
+
