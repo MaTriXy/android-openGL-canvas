@@ -1,5 +1,6 @@
 package com.chillingvan.canvasgl.glview.texture.gles;
 
+import android.nfc.Tag;
 import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
@@ -8,9 +9,8 @@ import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
-import android.util.Log;
 
-import com.chillingvan.canvasgl.Loggers;
+import com.chillingvan.canvasgl.util.FileLogger;
 
 import static com.chillingvan.canvasgl.glview.texture.gles.EglHelper.formatEglError;
 
@@ -20,6 +20,7 @@ import static com.chillingvan.canvasgl.glview.texture.gles.EglHelper.formatEglEr
 
 @RequiresApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
 public class EglHelperAPI17 implements IEglHelper {
+    private static final String TAG = "EglHelperAPI17";
 
     private GLThread.EGLConfigChooser eglConfigChooser;
     private GLThread.EGLContextFactory eglContextFactory;
@@ -38,7 +39,7 @@ public class EglHelperAPI17 implements IEglHelper {
 
     @Override
     public EglContextWrapper start(EglContextWrapper eglContext) {
-        Loggers.w("EglHelper", "start() tid=" + Thread.currentThread().getId());
+        FileLogger.w(TAG, "start() tid=" + Thread.currentThread().getId());
         /*
          * Get an EGL instance
          */
@@ -68,10 +69,11 @@ public class EglHelperAPI17 implements IEglHelper {
             */
         mEglContext = eglContextFactory.createContextAPI17(mEglDisplay, mEglConfig, eglContext.getEglContext());
         if (mEglContext == null || mEglContext == EGL14.EGL_NO_CONTEXT) {
+            FileLogger.d(TAG, "mEglContext:" + mEglContext);
             mEglContext = null;
-            throwEglException("createContext");
+            throwEglException("; createContext");
         }
-        Loggers.w("EglHelper", "createContext " + mEglContext + " tid=" + Thread.currentThread().getId());
+        FileLogger.w(TAG, "createContext " + mEglContext + " tid=" + Thread.currentThread().getId());
 
         mEglSurface = null;
 
@@ -83,7 +85,7 @@ public class EglHelperAPI17 implements IEglHelper {
 
     @Override
     public boolean createSurface(Object surface) {
-        Loggers.w("EglHelper", "createSurface()  tid=" + Thread.currentThread().getId());
+        FileLogger.w(TAG, "createSurface()  tid=" + Thread.currentThread().getId());
 
         if (mEglDisplay == null) {
             throw new RuntimeException("eglDisplay not initialized");
@@ -101,8 +103,9 @@ public class EglHelperAPI17 implements IEglHelper {
         if (mEglSurface == null || mEglSurface == EGL14.EGL_NO_SURFACE) {
             int error = EGL14.eglGetError();
             if (error == EGL14.EGL_BAD_NATIVE_WINDOW) {
-                Log.e("EglHelper", "createWindowSurface returned EGL_BAD_NATIVE_WINDOW.");
+                FileLogger.e(TAG, "createWindowSurface returned EGL_BAD_NATIVE_WINDOW.");
             }
+            FileLogger.e(TAG, "EGL_NO_SURFACE");
             return false;
         }
 
@@ -115,7 +118,7 @@ public class EglHelperAPI17 implements IEglHelper {
              * Could not make the context current, probably because the underlying
              * SurfaceView surface has been destroyed.
              */
-            logEglErrorAsWarning("EGLHelper", "eglMakeCurrent", EGL14.eglGetError());
+            logEglErrorAsWarning(TAG, "eglMakeCurrent", EGL14.eglGetError());
             return false;
         }
 
@@ -126,7 +129,7 @@ public class EglHelperAPI17 implements IEglHelper {
     @Override
     public int swap() {
         if (!EGL14.eglSwapBuffers(mEglDisplay, mEglSurface)) {
-            Loggers.w("EglHelperAPI17", String.format("swap: start get error"));
+            FileLogger.w(TAG, String.format("swap: start get error"));
             return EGL14.eglGetError();
         }
         return EGL14.EGL_SUCCESS;
@@ -134,9 +137,7 @@ public class EglHelperAPI17 implements IEglHelper {
 
     @Override
     public void destroySurface() {
-        if (GLThread.LOG_EGL) {
-            Log.w("EglHelper", "destroySurface()  tid=" + Thread.currentThread().getId());
-        }
+        FileLogger.w(TAG, "destroySurface()  tid=" + Thread.currentThread().getId());
         destroySurfaceImp();
     }
 
@@ -152,9 +153,7 @@ public class EglHelperAPI17 implements IEglHelper {
 
     @Override
     public void finish() {
-        if (GLThread.LOG_EGL) {
-            Log.w("EglHelper", "finish() tid=" + Thread.currentThread().getId());
-        }
+        FileLogger.w(TAG, "finish() tid=" + Thread.currentThread().getId());
         if (mEglContext != null) {
             eglContextFactory.destroyContext(mEglDisplay, mEglContext);
             mEglContext = null;
@@ -179,7 +178,7 @@ public class EglHelperAPI17 implements IEglHelper {
     }
 
     public static void logEglErrorAsWarning(String tag, String function, int error) {
-        Log.w(tag, formatEglError(function, error));
+        FileLogger.w(tag, formatEglError(function, error));
     }
 
     private void throwEglException(String function) {
@@ -188,7 +187,7 @@ public class EglHelperAPI17 implements IEglHelper {
 
     public static void throwEglException(String function, int error) {
         String message = formatEglError(function, error);
-        Loggers.e("EglHelper", "throwEglException tid=" + Thread.currentThread().getId() + " " + message);
+        FileLogger.e(TAG, "throwEglException tid=" + Thread.currentThread().getId() + " " + message);
         throw new RuntimeException(message);
     }
 }

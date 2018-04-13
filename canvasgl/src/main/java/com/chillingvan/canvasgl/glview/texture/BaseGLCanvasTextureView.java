@@ -9,17 +9,20 @@ import android.util.AttributeSet;
 
 import com.chillingvan.canvasgl.CanvasGL;
 import com.chillingvan.canvasgl.ICanvasGL;
-import com.chillingvan.canvasgl.Loggers;
+import com.chillingvan.canvasgl.util.Loggers;
 import com.chillingvan.canvasgl.OpenGLUtil;
 import com.chillingvan.canvasgl.glview.GLView;
 
 /**
- * Created by Chilling on 2016/11/11.
+ *
+ * From init to run: onSizeChange --> onSurfaceTextureAvailable --> createGLThread --> createSurface --> onSurfaceCreated --> onSurfaceChanged
+ * From pause to run: onResume --> createSurface --> onSurfaceChanged
+ * From stop to run: onResume --> onSurfaceTextureAvailable --> createGLThread --> createSurface  --> onSurfaceCreated --> onSurfaceChanged
  */
-
 abstract class BaseGLCanvasTextureView extends BaseGLTextureView implements GLViewRenderer {
 
 
+    private static final String TAG = "BaseGLCanvasTextureView";
     protected ICanvasGL mCanvas;
     private int backgroundColor = Color.TRANSPARENT;
 
@@ -49,7 +52,7 @@ abstract class BaseGLCanvasTextureView extends BaseGLTextureView implements GLVi
 
     @Override
     public void onSurfaceChanged(int width, int height) {
-        Loggers.d("BaseGLCanvasTextureView", "onSurfaceChanged: ");
+        Loggers.d(TAG, "onSurfaceChanged: ");
         mCanvas.setSize(width, height);
 
     }

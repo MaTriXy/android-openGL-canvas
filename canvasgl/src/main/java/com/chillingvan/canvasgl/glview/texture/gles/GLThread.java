@@ -30,6 +30,7 @@ import android.util.Log;
 import android.view.Choreographer;
 
 import com.chillingvan.canvasgl.glview.texture.GLViewRenderer;
+import com.chillingvan.canvasgl.util.FileLogger;
 
 import java.util.ArrayList;
 
@@ -42,15 +43,12 @@ import javax.microedition.khronos.egl.EGLSurface;
 import javax.microedition.khronos.opengles.GL;
 
 /**
- * Created by Chilling on 2016/10/30.
+ * Create GL Context --> Create Surface
+ * And then draw with OpenGL and finally eglSwap to update the screen.
  */
-
 public class GLThread extends Thread {
-    public final static boolean LOG_PAUSE_RESUME = false;
-    public final static boolean LOG_SURFACE = false;
-    public final static boolean LOG_RENDERER = false;
+    private static final String TAG = "GLThread";
     public final static boolean LOG_RENDERER_DRAW_FRAME = false;
-    public final static boolean LOG_EGL = false;
     public final static boolean LOG_THREADS = false;
 
     public final static int RENDERMODE_WHEN_DIRTY = 0;
@@ -67,7 +65,6 @@ public class GLThread extends Thread {
     private Object mSurface;
 
     private OnCreateGLContextListener onCreateGLContextListener;
-    private boolean mPreserveEGLContextOnPause = true;
 
 
     // Once the thread is started, all accesses to the following member
@@ -124,29 +121,23 @@ public class GLThread extends Thread {
     @Override
     public void run() {
         setName("GLThread " + getId());
-        if (LOG_THREADS) {
-            Log.i("GLThread", "starting tid=" + getId());
-        }
+        FileLogger.i(TAG, "starting tid=" + getId());
 
         try {
             guardedRun();
         } catch (InterruptedException e) {
             // fall thru and exit normally
+            FileLogger.e(TAG, "", e);
         } finally {
             sGLThreadManager.threadExiting(this);
         }
     }
 
 
-    public void setPreserveEGLContextOnPause(boolean mPreserveEGLContextOnPause) {
-        this.mPreserveEGLContextOnPause = mPreserveEGLContextOnPause;
-    }
-
-
-    /*
-         * This private method should only be called inside a
-         * synchronized(sGLThreadManager) block.
-         */
+    /**
+     * This private method should only be called inside a
+     * synchronized(sGLThreadManager) block.
+     */
     private void stopEglSurfaceLocked() {
         if (mHaveEglSurface) {
             mHaveEglSurface = false;
@@ -154,7 +145,7 @@ public class GLThread extends Thread {
         }
     }
 
-    /*
+    /**
      * This private method should only be called inside a
      * synchronized(sGLThreadManager) block.
      */
@@ -187,6 +178,7 @@ public class GLThread extends Thread {
 
             while (true) {
                 synchronized (sGLThreadManager) {
+                    // Create egl context here
                     while (true) {
                         if (mShouldExit) {
                             return;
@@ -203,13 +195,12 @@ public class GLThread extends Thread {
                             pausing = mRequestPaused;
                             mPaused = mRequestPaused;
                             sGLThreadManager.notifyAll();
-                            if (LOG_PAUSE_RESUME) {
-                                Log.i("GLThread", "mPaused is now " + mPaused + " tid=" + getId());
-                            }
+                            FileLogger.i(TAG, "mPaused is now " + mPaused + " tid=" + getId());
                         }
 
                         // Have we lost the EGL context?
                         if (lostEglContext) {
+                            FileLogger.i(TAG, "lostEglContext");
                             stopEglSurfaceLocked();
                             stopEglContextLocked();
                             lostEglContext = false;
@@ -217,29 +208,13 @@ public class GLThread extends Thread {
 
                         // When pausing, release the EGL surface:
                         if (pausing && mHaveEglSurface) {
-                            if (LOG_SURFACE) {
-                                Log.i("GLThread", "releasing EGL surface because paused tid=" + getId());
-                            }
+                            FileLogger.i(TAG, "releasing EGL surface because paused tid=" + getId());
                             stopEglSurfaceLocked();
                         }
 
-                        // When pausing, optionally release the EGL Context:
-                        if (pausing && mHaveEglContext) {
-                            boolean preserveEglContextOnPause = mPreserveEGLContextOnPause;
-                            if (!preserveEglContextOnPause) {
-                                stopEglContextLocked();
-                                if (LOG_SURFACE) {
-                                    Log.i("GLThread", "releasing EGL context because paused tid=" + getId());
-                                }
-                            }
-                        }
-
-
                         // Have we lost the SurfaceView surface?
                         if ((!mHasSurface) && (!mWaitingForSurface)) {
-                            if (LOG_SURFACE) {
-                                Log.i("GLThread", "noticed surfaceView surface lost tid=" + getId());
-                            }
+                            FileLogger.i(TAG, "noticed surfaceView surface lost tid=" + getId());
                             if (mHaveEglSurface) {
                                 stopEglSurfaceLocked();
                             }
@@ -250,17 +225,13 @@ public class GLThread extends Thread {
 
                         // Have we acquired the surface view surface?
                         if (mHasSurface && mWaitingForSurface) {
-                            if (LOG_SURFACE) {
-                                Log.i("GLThread", "noticed surfaceView surface acquired tid=" + getId());
-                            }
+                            FileLogger.i(TAG, "noticed surfaceView surface acquired tid=" + getId());
                             mWaitingForSurface = false;
                             sGLThreadManager.notifyAll();
                         }
 
                         if (doRenderNotification) {
-                            if (LOG_SURFACE) {
-                                Log.i("GLThread", "sending render notification tid=" + getId());
-                            }
+//                            Log.i(TAG, "sending render notification tid=" + getId());
                             mWantRenderNotification = false;
                             doRenderNotification = false;
                             mRenderComplete = true;
@@ -304,11 +275,7 @@ public class GLThread extends Thread {
                                     w = mWidth;
                                     h = mHeight;
                                     mWantRenderNotification = true;
-                                    if (LOG_SURFACE) {
-                                        Log.i("GLThread",
-                                                "noticing that we want render notification tid="
-                                                        + getId());
-                                    }
+                                    FileLogger.i(TAG, "noticing that we want render notification tid=" + getId());
 
                                     // Destroy and recreate the EGL surface.
                                     createEglSurface = true;
@@ -333,7 +300,7 @@ public class GLThread extends Thread {
 
                         // By design, this is the only place in a GLThread thread where we wait().
                         if (LOG_THREADS) {
-                            Log.i("GLThread", "waiting tid=" + getId()
+                            FileLogger.limitLog("", TAG, "waiting tid=" + getId()
                                     + " mHaveEglContext: " + mHaveEglContext
                                     + " mHaveEglSurface: " + mHaveEglSurface
                                     + " mFinishedCreatingEglSurface: " + mFinishedCreatingEglSurface
@@ -344,7 +311,7 @@ public class GLThread extends Thread {
                                     + " mWidth: " + mWidth
                                     + " mHeight: " + mHeight
                                     + " mRequestRender: " + mRequestRender
-                                    + " mRenderMode: " + mRenderMode);
+                                    + " mRenderMode: " + mRenderMode, 600);
                         }
                         sGLThreadManager.wait();
                     }
@@ -357,9 +324,7 @@ public class GLThread extends Thread {
                 }
 
                 if (createEglSurface) {
-                    if (LOG_SURFACE) {
-                        Log.w("GLThread", "egl createSurface");
-                    }
+                    FileLogger.w(TAG, "egl createSurface");
                     if (mEglHelper.createSurface(mSurface)) {
                         synchronized (sGLThreadManager) {
                             mFinishedCreatingEglSurface = true;
@@ -381,25 +346,23 @@ public class GLThread extends Thread {
                     createGlInterface = false;
                 }
 
+                // Make sure context and surface are created
                 if (createEglContext) {
-                    if (LOG_RENDERER) {
-                        Log.w("GLThread", "onSurfaceCreated");
-                    }
+                    FileLogger.w("GLThread", "onSurfaceCreated");
                     mRenderer.onSurfaceCreated();
                     createEglContext = false;
                 }
 
+
                 if (sizeChanged) {
-                    if (LOG_RENDERER) {
-                        Log.w("GLThread", "onSurfaceChanged(" + w + ", " + h + ")");
-                    }
+                    FileLogger.w(TAG, "onSurfaceChanged(" + w + ", " + h + ")");
                     mRenderer.onSurfaceChanged(w, h);
                     sizeChanged = false;
                 }
 
                 if (mChoreographerRenderWrapper.canSwap()) {
                     if (LOG_RENDERER_DRAW_FRAME) {
-                        Log.w("GLThread", "onDrawFrame tid=" + getId());
+                        Log.w(TAG, "onDrawFrame tid=" + getId());
                     }
                     mRenderer.onDrawFrame();
                     mEglHelper.setPresentationTime(frameTimeNanos);
@@ -409,9 +372,7 @@ public class GLThread extends Thread {
                         case EGL10.EGL_SUCCESS:
                             break;
                         case EGL11.EGL_CONTEXT_LOST:
-                            if (LOG_SURFACE) {
-                                Log.i("GLThread", "egl context lost tid=" + getId());
-                            }
+                            FileLogger.i(TAG, "egl context lost tid=" + getId());
                             lostEglContext = true;
                             break;
                         default:
@@ -530,9 +491,7 @@ public class GLThread extends Thread {
 
     public void surfaceCreated() {
         synchronized (sGLThreadManager) {
-            if (LOG_THREADS) {
-                Log.i("GLThread", "surfaceCreated tid=" + getId());
-            }
+            FileLogger.i(TAG, "surfaceCreated tid=" + getId());
             mHasSurface = true;
             mFinishedCreatingEglSurface = false;
             sGLThreadManager.notifyAll();
@@ -548,11 +507,13 @@ public class GLThread extends Thread {
         }
     }
 
+    /**
+     * mHasSurface = false --> mWaitingForSurface = true
+     * -->
+     */
     public void surfaceDestroyed() {
         synchronized (sGLThreadManager) {
-            if (LOG_THREADS) {
-                Log.i("GLThread", "surfaceDestroyed tid=" + getId());
-            }
+            FileLogger.i(TAG, "surfaceDestroyed tid=" + getId());
             mHasSurface = false;
             sGLThreadManager.notifyAll();
             while ((!mWaitingForSurface) && (!mExited)) {
@@ -565,17 +526,18 @@ public class GLThread extends Thread {
         }
     }
 
+    /**
+     * mRequestPaused --> mPaused, pausing
+     * --> pausing && mHaveEglSurface, stopEglSurfaceLocked()
+     * --> pausing && mHaveEglContext, preserve context or not.
+     */
     public void onPause() {
         synchronized (sGLThreadManager) {
-            if (LOG_PAUSE_RESUME) {
-                Log.i("GLThread", "onPause tid=" + getId());
-            }
+            FileLogger.i(TAG, "onPause tid=" + getId());
             mRequestPaused = true;
             sGLThreadManager.notifyAll();
             while ((!mExited) && (!mPaused)) {
-                if (LOG_PAUSE_RESUME) {
-                    Log.i("Main thread", "onPause waiting for mPaused.");
-                }
+                FileLogger.i(TAG, "onPause waiting for mPaused.");
                 try {
                     sGLThreadManager.wait();
                 } catch (InterruptedException ex) {
@@ -588,17 +550,13 @@ public class GLThread extends Thread {
 
     public void onResume() {
         synchronized (sGLThreadManager) {
-            if (LOG_PAUSE_RESUME) {
-                Log.i("GLThread", "onResume tid=" + getId());
-            }
+            FileLogger.i(TAG, "onResume tid=" + getId());
             mRequestPaused = false;
             mRequestRender = true;
             mRenderComplete = false;
             sGLThreadManager.notifyAll();
             while ((!mExited) && mPaused && (!mRenderComplete)) {
-                if (LOG_PAUSE_RESUME) {
-                    Log.i("Main thread", "onResume waiting for !mPaused.");
-                }
+                FileLogger.i(TAG, "onResume waiting for !mPaused.");
                 try {
                     sGLThreadManager.wait();
                 } catch (InterruptedException ex) {
@@ -611,6 +569,7 @@ public class GLThread extends Thread {
 
     public void onWindowResize(int w, int h) {
         synchronized (sGLThreadManager) {
+            FileLogger.d(TAG, "width:" + w + " height:" + h);
             mWidth = w;
             mHeight = h;
             mSizeChanged = true;
@@ -631,9 +590,7 @@ public class GLThread extends Thread {
             // Wait for thread to react to resize and render a frame
             while (!mExited && !mPaused && !mRenderComplete
                     && ableToDraw()) {
-                if (LOG_SURFACE) {
-                    Log.i("Main thread", "onWindowResize waiting for render complete from tid=" + getId());
-                }
+                FileLogger.i(TAG, "onWindowResize waiting for render complete from tid=" + getId());
                 try {
                     sGLThreadManager.wait();
                 } catch (InterruptedException ex) {
@@ -695,9 +652,7 @@ public class GLThread extends Thread {
         private GLThread mEglOwner;
 
         public synchronized void threadExiting(GLThread thread) {
-            if (LOG_THREADS) {
-                Log.i("GLThread", "exiting tid=" + thread.getId());
-            }
+            FileLogger.i(TAG, "exiting tid=" + thread.getId());
             thread.mExited = true;
             if (mEglOwner == thread) {
                 mEglOwner = null;
@@ -966,10 +921,7 @@ public class GLThread extends Thread {
         public void destroyContext(EGL10 egl, EGLDisplay display,
                                    EGLContext context) {
             if (!egl.eglDestroyContext(display, context)) {
-                Log.e("DefaultContextFactory", "display:" + display + " context: " + context);
-                if (LOG_THREADS) {
-                    Log.i("DefaultContextFactory", "tid=" + Thread.currentThread().getId());
-                }
+                FileLogger.e(TAG, "DefaultContextFactory " + "display:" + display + " context: " + context);
                 EglHelper.throwEglException("eglDestroyContext", egl.eglGetError());
             }
         }
@@ -987,10 +939,7 @@ public class GLThread extends Thread {
         @Override
         public void destroyContext(android.opengl.EGLDisplay display, android.opengl.EGLContext context) {
             if (!EGL14.eglDestroyContext(display, context)) {
-                Log.e("DefaultContextFactory", "display:" + display + " context: " + context);
-                if (LOG_THREADS) {
-                    Log.i("DefaultContextFactory", "tid=" + Thread.currentThread().getId());
-                }
+                FileLogger.e(TAG, "DefaultContextFactory " + "display:" + display + " context: " + context);
                 EglHelper.throwEglException("eglDestroyContext", EGL14.eglGetError());
             }
         }
@@ -1162,6 +1111,7 @@ public class GLThread extends Thread {
     public static class ChoreographerRender implements Choreographer.FrameCallback {
 
         private GLThread glThread;
+        // Only used when render mode is RENDERMODE_CONTINUOUSLY
         private boolean canSwap = true;
 
         @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
