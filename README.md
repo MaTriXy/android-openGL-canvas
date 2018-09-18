@@ -48,7 +48,7 @@ allprojects {
 
 // module build.gradle
 dependencies {
-    compile 'com.github.ChillingVan:android-openGL-canvas:v1.2.2.3'
+    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.4.0.0'
 }
 ```
 
@@ -77,7 +77,7 @@ public class MyGLView extends GLView {
 
 ![canvas](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/canvas-example-v1.png)
 
-* 其中, GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLSurfaceTextureProducerView and GLSharedContextView 用法相似.
+* 其中, GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLMultiTexProducerView and GLMultiTexConsumerView 用法相似.
 
 
 * 使用CanvasGL实现绘制
@@ -106,7 +106,7 @@ public class MyGLView extends GLView {
 * 可以与Camera结合，注意运行样例代码的时候尽量使用真机而不是模拟器。
 ![camera](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/camera-example-v1.jpg)
 
-* 如果不想使用View，可以使用 OffScreenCanvas 实现脱离屏幕的绘制，然后使用getDrawingBitmap方法获取绘制的内容。
+* 如果不想使用View，可以使用 MultiTexOffScreenCanvas 实现脱离屏幕的绘制，然后使用getDrawingBitmap方法获取绘制的内容。
 
 
 * MediaPlayer
@@ -115,21 +115,32 @@ public class MyGLView extends GLView {
 如果用本项目里的 GLSurfaceTextureProducerView ，那么还可以做视频处理。
 结合[AndroidInstantVideo](https://github.com/ChillingVan/AndroidInstantVideo)的stream publisher，就能生成新视频。
 
+* AndroidCanvasHelper
+
+这个GLCanvas不能绘制文本。只能先把文本转成Bitmap来绘制 
+可以使用AndroidCanvasHelper来画任意东西再转化为Bitmap给GLCanvas 
+这有同步和异步模式，视情况用对应的模式，详细请看例子。
+
 
 * [更多用例请查看wiki](https://github.com/ChillingVan/android-openGL-canvas/wiki)
 
-## 注意事项
+## 注意事项和常见问题
 * 每一个View的onGLDraw都运行在自己的线程而非主线程。
 * 目前的Filter没有GPUImage里那么多，后续会陆续增加，如果有需要，参照我的代码自己实现即可，难度不高。
+* 为什么Bitmap修改后，再次绘制时并没更新？
+
+  因为没有调用canvasGL的invalidateTextureContent(bitmap)。改变了的Bitmap需要重新绑定texture。因为绑定需要耗时，所以库里面才不做成每次都重新绑定。
 
 ## 相关博客文章
 * [OpenGL绘制一张图片的流程](http://www.jianshu.com/p/40521c92ef85)
 * [如何封装 opengl 流程](http://www.jianshu.com/p/c45d11627c70)
 * [代替GLSurfaceView的GLTextureView](http://www.jianshu.com/p/5a127d43b39a)
+* [为什么你的canvas那么慢？浅析Android的canvas性能](https://www.jianshu.com/p/5a0c61c286e6)
 
 
 ## 最近更新
-* 修复在GLProducedTextureView尺寸改变时重复创建producedTexture
+* 增加 MultiTexOffScreenCanvas, GLMultiTexProducerView, GLMultiTexConsumerView，支持提供多张纹理的和消化多张纹理
+* 增加AndroidCanvasHelper及其绘制文本的例子
 
 ## License
     Copyright 2016 ChillingVan.

@@ -43,7 +43,7 @@ allprojects {
 
 // module build.gradle
 dependencies {
-    compile 'com.github.ChillingVan:android-openGL-canvas:v1.2.2.3'
+    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.4.0.0'
 }
 ```
 
@@ -72,7 +72,7 @@ public class MyGLView extends GLView {
 
 ![canvas](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/canvas-example-v1.png)
 
-* The Usage of GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLSurfaceTextureProducerView and GLSharedContextView is similar.
+* The Usage of GLContinuouslyView, GLTextureView, GLContinuousTextureView, GLMultiTexProducerView and GLMultiTexConsumerView is similar.
 
 
 * Using canvas to draw
@@ -103,7 +103,7 @@ public class MyGLView extends GLView {
 ![camera](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/camera-example-v1.jpg)
 
 
-* If you do not want to use GLView, you can use OffScreenCanvas to draw things and fetch it by getDrawingBitmap.
+* If you do not want to use GLView, you can use MultiTexOffScreenCanvas to draw things and fetch it by getDrawingBitmap.
 
 * MediaPlayer
 
@@ -111,15 +111,26 @@ You can use MediaPlayer to decode video and draw it on the TextureView.
 If you use GLSurfaceTextureProducerView, then you can process the video frames and provide the texture to MediaCodec to create a new Video. 
 Use this sample and the stream publisher sample of [AndroidInstantVideo](https://github.com/ChillingVan/AndroidInstantVideo). You can implement this.
 
+* AndroidCanvasHelper
+
+This GLCanvas cannot draw text. 
+You can use AndroidCanvasHelper to draw what you want and turn it to bitmap for GLCanvas. 
+It has sync and async modes.
+
 * See the wiki page for more use case.[here](https://github.com/ChillingVan/android-openGL-canvas/wiki)
 
-## Notice
+## Note & FAQ
 * The onGLDraw method in GLView runs in its own thread but not the main thread. 
 * I haven't implemented all the filters in GPUImage. I will add more later. If you need, you can take my code as example to implement your filter. It is simple.
 * Remember to call onResume and onPause in the Activity lifecycle when using GLContinuousView and GLContinuousTextureView.
+* Why the bitmap drawn is not updated even the bitmap is changed?
+
+  You can use canvasGL.invalidateTextureContent(bitmap) to rebind the bitmap to texture. 
+  This is kind of heavy so I do not update call this for every drawn.
 
 ## Latest Update
-* Fix issue that recreate for producedTexture of GLProducedTextureView.
+* Add MultiTexOffScreenCanvas, GLMultiTexProducerView, GLMultiTexConsumerView to support producing multiple textures and consume multiple textures
+* Add AndroidCanvasHelper and its example for drawing text.
 
 ## License
     Copyright 2016 ChillingVan.
@@ -135,11 +146,3 @@ Use this sample and the stream publisher sample of [AndroidInstantVideo](https:/
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-### Donate
-Thanks for your support !!!
-![alipay](http://upload-images.jianshu.io/upload_images/3587192-1cc20071ce4a042a.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
-alipay
-![wechat pay](http://upload-images.jianshu.io/upload_images/3587192-3289f8237d98b2c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
-wechat pay
-
