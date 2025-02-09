@@ -41,6 +41,7 @@ import java.util.List;
  * This will not create {@link GLThread} automatically. You need to call {@link #setSharedEglContext(EglContextWrapper)} to trigger it.
  * Support providing multiple textures to Camera or Media. <br>
  * This can also consume textures from other GL zone( Should be in same GL context) <br>
+ * And since this inherits {@link GLMultiTexConsumerView}, the {@link #setSharedEglContext} must be called
  */
 public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
     private static final String TAG = "GLMultiTexProducerView";
@@ -106,15 +107,16 @@ public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
     @Override
     public void onSurfaceChanged(int width, int height) {
         super.onSurfaceChanged(width, height);
-        Loggers.d(TAG, "onSurfaceChanged: ");
+        Loggers.d(TAG, "onSurfaceChanged: " + width + ", " + height);
         if (producedTextureList.isEmpty()) {
             for (int i = 0; i < getInitialTexCount(); i++) {
+                // This must be in this thread because it relies on the GLContext of this thread
                 producedTextureList.add(GLTexture.createRaw(width, height, false, producedTextureTarget, mCanvas));
             }
             post(new Runnable() {
                 @Override
                 public void run() {
-                    if (surfaceTextureCreatedListener != null) {
+                    if (!producedTextureList.isEmpty() && surfaceTextureCreatedListener != null) {
                         surfaceTextureCreatedListener.onCreated(producedTextureList);
                     }
                 }
@@ -131,6 +133,7 @@ public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
         if (producedTextureTarget != GLES20.GL_TEXTURE_2D) {
             for (GLTexture glTexture : producedTextureList) {
                 glTexture.getSurfaceTexture().updateTexImage();
+                glTexture.getRawTexture().setNeedInvalidate(true);
             }
         }
         super.onDrawFrame();
@@ -139,6 +142,7 @@ public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
     @Override
     public void onPause() {
         super.onPause();
+        Loggers.d(TAG, "onPause");
         recycleProduceTexture();
         if (mGLThread == null) {
             Log.w(TAG, "!!!!!! You may not call setShareEglContext !!!");
@@ -167,6 +171,10 @@ public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
         producedTextureList.clear();
     }
 
+    /**
+     * Set the listener to listen the texture creation.
+     * @param surfaceTextureCreatedListener The texture listener
+     */
     public void setSurfaceTextureCreatedListener(SurfaceTextureCreatedListener surfaceTextureCreatedListener) {
         this.surfaceTextureCreatedListener = surfaceTextureCreatedListener;
     }
@@ -175,14 +183,20 @@ public abstract class GLMultiTexProducerView extends GLMultiTexConsumerView {
      * Listen when the produced textures created.
      */
     public interface SurfaceTextureCreatedListener {
+        /**
+         * You can get the created Textures from this method.
+         * The number of textures is decided by {@link GLMultiTexProducerView#getInitialTexCount}
+         * @param producedTextureList The created Textures
+         */
         void onCreated(List<GLTexture> producedTextureList);
     }
 
     /**
      * If {@link #setSharedEglContext(EglContextWrapper)} is not called, this will not be triggered.
-     * @param canvas
-     * @param producedTextures
-     * @param consumedTextures
+     * The consumedTextures are obtained from {@link GLMultiTexConsumerView#addConsumeGLTexture}
+     * @param canvas the canvas to draw things
+     * @param producedTextures The textures created by itself.
+     * @param consumedTextures May be null. This only available when it gets from other GLMultiTexProducerView
      */
     protected abstract void onGLDraw(ICanvasGL canvas, List<GLTexture> producedTextures, List<GLTexture> consumedTextures);
 }

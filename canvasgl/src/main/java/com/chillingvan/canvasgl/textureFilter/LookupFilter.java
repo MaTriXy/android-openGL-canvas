@@ -2,12 +2,13 @@ package com.chillingvan.canvasgl.textureFilter;
 
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
-import android.support.annotation.FloatRange;
-import android.support.annotation.NonNull;
 
 import com.chillingvan.canvasgl.ICanvasGL;
 import com.chillingvan.canvasgl.OpenGLUtil;
 import com.chillingvan.canvasgl.glcanvas.BasicTexture;
+
+import androidx.annotation.FloatRange;
+import androidx.annotation.NonNull;
 
 /**
  * Created by Chilling on 2018/5/4.
@@ -54,6 +55,9 @@ public class LookupFilter extends TwoTextureFilter implements OneValueFilter {
 
     public LookupFilter(@NonNull Bitmap secondBitmap) {
         super(secondBitmap);
+    }
+
+    public LookupFilter() {
     }
 
     @Override

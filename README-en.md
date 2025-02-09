@@ -15,7 +15,7 @@ Used by:
 * Similar to the filters of GPUImage, you can apply the filter to the bitmap draw into the GLViews. 
 * Provides GLViews that using GLSurfaceView and TextureView. 
 
-* The GLContinuousView can provide high performance continuous rendering animation because it uses openGL to draw in its own thread.
+* The GLContinuousView can provide high performance continuous rendering animation because it uses openGL to draw in its own thread. (If you just need this feature, I recommend you extend View instead.)
 ![anim](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/anim-activity-example.png)
 
 Compare to GPUImage:
@@ -43,7 +43,7 @@ allprojects {
 
 // module build.gradle
 dependencies {
-    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.4.0.0'
+    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.5.4.0'
 }
 ```
 
@@ -127,10 +127,20 @@ It has sync and async modes.
 
   You can use canvasGL.invalidateTextureContent(bitmap) to rebind the bitmap to texture. 
   This is kind of heavy so I do not update call this for every drawn.
+* The CanvasGL doesn't support drawPath or drawText. You can try IAndroidCanvasHelper but this just uses Android canvas to generate a Bitmap. So heed the performance.
 
 ## Latest Update
+* Add GaussianBlurFilter & Fix FilterGroup ViewPort Issue (1.5.4, Thanks to [@iffly](https://github.com/feiyin0719))
+* Add record screen demo
+* Add clearTextureCache to help clear cache faster than WeakHashMap. (1.5.2)
+* Can operate bitmap when using AndroidCanvasHelper (1.5.2)
+* The TwoTextureFilter supports RawTexture.
+* The drawSurfaceTexture supports BitmapMatrix.
+* Fix the out of shape when using rotate matrix;
+* Add OrthoBitmapMatrix as One BitmapMatrix. Default BitmapMatrix uses perspective matrix.
+* Fix BitmapMatrix cut by small viewport issue when Bitmap out of screen.
+* Support cut bitmap with CropFilter
 * Add MultiTexOffScreenCanvas, GLMultiTexProducerView, GLMultiTexConsumerView to support producing multiple textures and consume multiple textures
-* Add AndroidCanvasHelper and its example for drawing text.
 
 ## License
     Copyright 2016 ChillingVan.

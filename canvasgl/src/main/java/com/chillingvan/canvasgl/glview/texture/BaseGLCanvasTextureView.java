@@ -4,14 +4,15 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
-import android.support.annotation.ColorInt;
 import android.util.AttributeSet;
 
 import com.chillingvan.canvasgl.CanvasGL;
 import com.chillingvan.canvasgl.ICanvasGL;
-import com.chillingvan.canvasgl.util.Loggers;
 import com.chillingvan.canvasgl.OpenGLUtil;
 import com.chillingvan.canvasgl.glview.GLView;
+import com.chillingvan.canvasgl.util.Loggers;
+
+import androidx.annotation.ColorInt;
 
 /**
  *
@@ -46,7 +47,7 @@ abstract class BaseGLCanvasTextureView extends BaseGLTextureView implements GLVi
 
     @Override
     public void onSurfaceCreated() {
-        Loggers.d("BaseGLCanvasTextureView", "onSurfaceCreated: ");
+        Loggers.d(TAG, "onSurfaceCreated: ");
         mCanvas = new CanvasGL();
     }
 
@@ -63,11 +64,29 @@ abstract class BaseGLCanvasTextureView extends BaseGLTextureView implements GLVi
         onGLDraw(mCanvas);
     }
 
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mCanvas != null) {
+            mCanvas.pause();
+        }
+    }
+
+    /**
+     * Force clear texture and bitmap cache of the canvas. This is not necessary needed.
+     * The canvas uses weak HashMap to reference bitmap and will recycle the texture when finalize
+     */
+    public void clearTextureCache() {
+        if (mCanvas != null) {
+            mCanvas.clearBitmapCache();
+        }
+    }
+
     protected abstract void onGLDraw(ICanvasGL canvas);
 
 
     /**
-     * If setOpaque(false) used, this method will not work.
+     * If setOpaque(true) used, this method will not work.
      */
     public void setRenderBackgroundColor(@ColorInt int color) {
         this.backgroundColor = color;

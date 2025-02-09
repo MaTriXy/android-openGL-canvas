@@ -59,7 +59,11 @@ public abstract class GLView extends GLSurfaceView implements GLSurfaceView.Rend
     protected void init() {
         setZOrderOnTop(true);
         setEGLContextClientVersion(2);
-        setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0);
+        } else {
+            setEGLConfigChooser(5, 6, 5, 8, 0, 0);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
             setPreserveEGLContextOnPause(true);
         }
@@ -99,9 +103,19 @@ public abstract class GLView extends GLSurfaceView implements GLSurfaceView.Rend
 
     public void stop() {
         onPause();
+        if (mCanvas != null) {
+            mCanvas.pause();
+        }
     }
 
-    public void destroy() {
+    /**
+     * Force clear texture and bitmap cache of the canvas. This is not necessary needed.
+     * The canvas uses weak HashMap to reference bitmap and will recycle the texture when finalize
+     */
+    public void clearBitmapCache() {
+        if (mCanvas != null) {
+            mCanvas.clearBitmapCache();
+        }
     }
 
     public void setOnSizeChangeCallback(OnSizeChangeCallback onSizeChangeCallback) {

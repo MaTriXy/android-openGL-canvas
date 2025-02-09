@@ -28,9 +28,6 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
 import android.os.Build;
-import android.support.annotation.IntRange;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 
 import com.chillingvan.canvasgl.glcanvas.BasicTexture;
 import com.chillingvan.canvasgl.glcanvas.BitmapTexture;
@@ -39,6 +36,7 @@ import com.chillingvan.canvasgl.glcanvas.GLES20Canvas;
 import com.chillingvan.canvasgl.glcanvas.GLPaint;
 import com.chillingvan.canvasgl.glcanvas.RawTexture;
 import com.chillingvan.canvasgl.glcanvas.UploadedTexture;
+import com.chillingvan.canvasgl.matrix.IBitmapMatrix;
 import com.chillingvan.canvasgl.shapeFilter.BasicDrawShapeFilter;
 import com.chillingvan.canvasgl.shapeFilter.DrawCircleFilter;
 import com.chillingvan.canvasgl.shapeFilter.DrawShapeFilter;
@@ -49,6 +47,10 @@ import com.chillingvan.canvasgl.textureFilter.TextureFilter;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import androidx.annotation.IntRange;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 /**
  * All the depth of textures are the same. So the texture drawn after will cover the texture drawn before.
  */
@@ -56,13 +58,14 @@ public class CanvasGL implements ICanvasGL {
 
     private Map<Bitmap, BasicTexture> bitmapTextureMap = new WeakHashMap<>();
     protected final GLCanvas glCanvas;
-    protected final BasicTextureFilter basicTextureFilter;
+    protected final BasicTextureFilter defaultTextureFilter;
     private float[] canvasBackgroundColor;
     private float[] surfaceTextureMatrix = new float[16];
     private int width;
     private int height;
-    private BasicDrawShapeFilter basicDrawShapeFilter;
+    private BasicDrawShapeFilter defaultDrawShapeFilter;
     private DrawCircleFilter drawCircleFilter = new DrawCircleFilter();
+    private TextureFilter currentTextureFilter;
 
     public CanvasGL() {
         this(new GLES20Canvas());
@@ -82,8 +85,8 @@ public class CanvasGL implements ICanvasGL {
                 textureFilter.onPreDraw(textureProgram, texture, CanvasGL.this);
             }
         });
-        basicTextureFilter = new BasicTextureFilter();
-        basicDrawShapeFilter = new BasicDrawShapeFilter();
+        defaultTextureFilter = new BasicTextureFilter();
+        defaultDrawShapeFilter = new BasicDrawShapeFilter();
         canvasBackgroundColor = new float[4];
     }
 
@@ -96,6 +99,17 @@ public class CanvasGL implements ICanvasGL {
         GLES20.glBindTexture(texture.getTarget(), texture.getId());
         GLES20Canvas.checkError();
         return texture;
+    }
+
+    @Override
+    public void bindRawTexture(int whichTexture, RawTexture texture) {
+        GLES20.glActiveTexture(whichTexture);
+        GLES20Canvas.checkError();
+        if (!texture.isLoaded()) {
+            texture.prepare(glCanvas);
+        }
+        GLES20.glBindTexture(texture.getTarget(), texture.getId());
+        GLES20Canvas.checkError();
     }
 
     @Override
@@ -115,27 +129,69 @@ public class CanvasGL implements ICanvasGL {
 
     @Override
     public void drawSurfaceTexture(BasicTexture texture, SurfaceTexture surfaceTexture, int left, int top, int right, int bottom) {
-        drawSurfaceTexture(texture, surfaceTexture, left, top, right, bottom, basicTextureFilter);
+        drawSurfaceTexture(texture, surfaceTexture, left, top, right, bottom, defaultTextureFilter);
     }
 
     @Override
-    public void drawSurfaceTexture(BasicTexture texture, SurfaceTexture surfaceTexture, int left, int top, int right, int bottom, TextureFilter basicTextureFilter) {
+    public void drawSurfaceTexture(BasicTexture texture, final SurfaceTexture surfaceTexture, int left, int top, int right, int bottom, TextureFilter basicTextureFilter) {
+        drawSurfaceTexture(texture, surfaceTexture, left, top, right, bottom, null, basicTextureFilter);
+    }
+
+    @Override
+    public void drawSurfaceTexture(BasicTexture texture, @Nullable SurfaceTexture surfaceTexture, @NonNull IBitmapMatrix matrix) {
+        drawSurfaceTexture(texture, surfaceTexture, matrix, defaultTextureFilter);
+    }
+
+    @Override
+    public void drawSurfaceTexture(BasicTexture texture, @Nullable SurfaceTexture surfaceTexture, @Nullable final IBitmapMatrix matrix, @NonNull TextureFilter textureFilter) {
+        drawSurfaceTexture(texture, surfaceTexture, 0, 0, texture.getWidth(), texture.getHeight(), matrix, textureFilter);
+    }
+
+    @Override
+    public void drawSurfaceTexture(BasicTexture texture, final SurfaceTexture surfaceTexture, int left, int top, int right, int bottom, @Nullable final IBitmapMatrix matrix, TextureFilter textureFilter) {
+        currentTextureFilter = textureFilter;
+        BasicTexture filteredTexture = texture;
+        if (textureFilter instanceof FilterGroup) {
+            filteredTexture = getFilterGroupTexture(texture, surfaceTexture, (FilterGroup) textureFilter);
+        }
+        GLCanvas.ICustomMVPMatrix customMVPMatrix = matrix == null ? null : new GLCanvas.ICustomMVPMatrix() {
+            @Override
+            public float[] getMVPMatrix(int viewportW, int viewportH, float x, float y, float drawW, float drawH) {
+                return matrix.obtainResultMatrix(viewportW, viewportH, x, y, drawW, drawH);
+            }
+        };
         if (surfaceTexture == null) {
-            glCanvas.drawTexture(texture, left, top, right - left, bottom - top, basicTextureFilter, null);
+            glCanvas.drawTexture(filteredTexture, left, top, right - left, bottom - top, textureFilter, customMVPMatrix);
         } else {
             surfaceTexture.getTransformMatrix(surfaceTextureMatrix);
-            glCanvas.drawTexture(texture, surfaceTextureMatrix, left, top, right - left, bottom - top, basicTextureFilter, null);
+            glCanvas.drawTexture(filteredTexture, surfaceTextureMatrix, left, top, right - left, bottom - top, textureFilter, customMVPMatrix);
         }
     }
 
+    private BasicTexture getFilterGroupTexture(BasicTexture texture, final SurfaceTexture surfaceTexture, FilterGroup basicTextureFilter) {
+        FilterGroup filterGroup = basicTextureFilter;
+        texture = filterGroup.draw(texture, glCanvas, new FilterGroup.OnDrawListener() {
+            @Override
+            public void onDraw(BasicTexture drawTexture, TextureFilter textureFilter, boolean isFirst) {
+                if (isFirst) {
+                    surfaceTexture.getTransformMatrix(surfaceTextureMatrix);
+                    glCanvas.drawTexture(drawTexture, surfaceTextureMatrix, 0, 0, drawTexture.getWidth(), drawTexture.getHeight(), textureFilter, null);
+                } else {
+                    glCanvas.drawTexture(drawTexture, 0, 0, drawTexture.getWidth(), drawTexture.getHeight(), textureFilter, null);
+                }
+            }
+        });
+        return texture;
+    }
+
 
     @Override
-    public void drawBitmap(Bitmap bitmap, @NonNull BitmapMatrix matrix) {
-        drawBitmap(bitmap, matrix, basicTextureFilter);
+    public void drawBitmap(Bitmap bitmap, @NonNull IBitmapMatrix matrix) {
+        drawBitmap(bitmap, matrix, defaultTextureFilter);
     }
 
     @Override
-    public void drawBitmap(Bitmap bitmap, final BitmapMatrix matrix, TextureFilter textureFilter) {
+    public void drawBitmap(Bitmap bitmap, final IBitmapMatrix matrix, TextureFilter textureFilter) {
         BasicTexture basicTexture = getTexture(bitmap, textureFilter);
         save();
         glCanvas.drawTexture(basicTexture, 0, 0, bitmap.getWidth(), bitmap.getHeight(), textureFilter, new GLCanvas.ICustomMVPMatrix() {
@@ -149,12 +205,12 @@ public class CanvasGL implements ICanvasGL {
 
     @Override
     public void drawBitmap(Bitmap bitmap, Rect src, RectF dst) {
-        drawBitmap(bitmap, new RectF(src), dst, basicTextureFilter);
+        drawBitmap(bitmap, new RectF(src), dst, defaultTextureFilter);
     }
 
     @Override
     public void drawBitmap(Bitmap bitmap, int left, int top) {
-        drawBitmap(bitmap, left, top, basicTextureFilter);
+        drawBitmap(bitmap, left, top, defaultTextureFilter);
     }
 
     @Override
@@ -179,7 +235,7 @@ public class CanvasGL implements ICanvasGL {
 
     @Override
     public void drawBitmap(Bitmap bitmap, int left, int top, int width, int height) {
-        drawBitmap(bitmap, left, top, width, height, basicTextureFilter);
+        drawBitmap(bitmap, left, top, width, height, defaultTextureFilter);
     }
 
     @Override
@@ -189,19 +245,29 @@ public class CanvasGL implements ICanvasGL {
     }
 
     protected BasicTexture getTexture(Bitmap bitmap, @Nullable TextureFilter textureFilter) {
+        currentTextureFilter = textureFilter;
         throwIfCannotDraw(bitmap);
 
         BasicTexture resultTexture = getTextureFromMap(bitmap);
 
         if (textureFilter instanceof FilterGroup) {
             FilterGroup filterGroup = (FilterGroup) textureFilter;
-            resultTexture = filterGroup.draw(resultTexture, glCanvas);
+            resultTexture = filterGroup.draw(resultTexture, glCanvas, new FilterGroup.OnDrawListener() {
+                @Override
+                public void onDraw(BasicTexture drawTexture, TextureFilter textureFilter, boolean isFirst) {
+                    glCanvas.drawTexture(drawTexture, 0, 0, drawTexture.getWidth(), drawTexture.getHeight(), textureFilter, null);
+                }
+            });
         }
 
 
         return resultTexture;
     }
 
+    /***
+     * Use this to the bitmap to texture. Called when your bitmap content pixels changed
+     * @param bitmap the bitmap whose content pixels changed
+     */
     @Override
     public void invalidateTextureContent(Bitmap bitmap) {
         BasicTexture resultTexture = getTextureFromMap(bitmap);
@@ -233,7 +299,7 @@ public class CanvasGL implements ICanvasGL {
 
     @Override
     public void drawLine(float startX, float startY, float stopX, float stopY, GLPaint paint) {
-        glCanvas.drawLine(startX, startY, stopX, stopY, paint, basicDrawShapeFilter);
+        glCanvas.drawLine(startX, startY, stopX, stopY, paint, defaultDrawShapeFilter);
     }
 
 
@@ -250,9 +316,9 @@ public class CanvasGL implements ICanvasGL {
     @Override
     public void drawRect(float left, float top, float right, float bottom, GLPaint paint) {
         if (paint.getStyle() == Paint.Style.STROKE) {
-            glCanvas.drawRect(left, top, right - left, bottom - top, paint, basicDrawShapeFilter);
+            glCanvas.drawRect(left, top, right - left, bottom - top, paint, defaultDrawShapeFilter);
         } else {
-            glCanvas.fillRect(left, top, right - left, bottom - top, paint.getColor(), basicDrawShapeFilter);
+            glCanvas.fillRect(left, top, right - left, bottom - top, paint.getColor(), defaultDrawShapeFilter);
         }
     }
 
@@ -338,6 +404,25 @@ public class CanvasGL implements ICanvasGL {
     }
 
     @Override
+    public void resume() {
+    }
+
+    @Override
+    public void pause() {
+        if (currentTextureFilter != null) {
+            currentTextureFilter.destroy();
+        }
+    }
+
+    @Override
+    public void clearBitmapCache() {
+        for (BasicTexture bitmapTexture : bitmapTextureMap.values()) {
+            bitmapTexture.recycle();
+        }
+        bitmapTextureMap.clear();
+    }
+
+    @Override
     public void setAlpha(@IntRange(from = 0, to = 255) int alpha) {
         glCanvas.setAlpha(alpha/(float)255);
     }
@@ -345,9 +430,7 @@ public class CanvasGL implements ICanvasGL {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        for (BasicTexture bitmapTexture : bitmapTextureMap.values()) {
-            bitmapTexture.recycle();
-        }
+        clearBitmapCache();
     }
 
     protected void throwIfCannotDraw(Bitmap bitmap) {

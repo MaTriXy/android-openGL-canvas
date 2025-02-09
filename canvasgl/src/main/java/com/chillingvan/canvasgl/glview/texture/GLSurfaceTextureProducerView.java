@@ -22,7 +22,6 @@ package com.chillingvan.canvasgl.glview.texture;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 
 import com.chillingvan.canvasgl.ICanvasGL;
@@ -31,6 +30,8 @@ import com.chillingvan.canvasgl.glcanvas.RawTexture;
 import com.chillingvan.canvasgl.glview.texture.gles.EglContextWrapper;
 
 import java.util.List;
+
+import androidx.annotation.Nullable;
 
 /**
  * <p>
@@ -62,7 +63,7 @@ public abstract class GLSurfaceTextureProducerView extends GLMultiTexProducerVie
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         super.onSurfaceTextureAvailable(surface, width, height);
-        if (mGLThread == null) {
+        if (mSharedEglContext == null) {
             setSharedEglContext(EglContextWrapper.EGL_NO_CONTEXT_WRAPPER);
         }
     }
@@ -87,11 +88,17 @@ public abstract class GLSurfaceTextureProducerView extends GLMultiTexProducerVie
         if (!consumedTextures.isEmpty()) {
             GLTexture consumeTexture = consumedTextures.get(0);
             onGLDraw(canvas, glTexture.getSurfaceTexture(), glTexture.getRawTexture(), consumeTexture.getSurfaceTexture(), consumeTexture.getRawTexture());
+            onGLDraw(canvas, glTexture, consumeTexture);
         } else {
             onGLDraw(canvas, glTexture.getSurfaceTexture(), glTexture.getRawTexture(), null, null);
+            onGLDraw(canvas, glTexture, null);
         }
     }
 
-    protected abstract void onGLDraw(ICanvasGL canvas, SurfaceTexture producedSurfaceTexture, RawTexture producedRawTexture, @Nullable SurfaceTexture outsideSurfaceTexture, @Nullable BasicTexture outsideTexture);
+    @Deprecated
+    protected void onGLDraw(ICanvasGL canvas, SurfaceTexture producedSurfaceTexture, RawTexture producedRawTexture, @Nullable SurfaceTexture outsideSurfaceTexture, @Nullable BasicTexture outsideTexture) {
+    }
 
+    protected void onGLDraw(ICanvasGL canvas, GLTexture producedGLTexture, @Nullable GLTexture outsideGLTexture) {
+    }
 }

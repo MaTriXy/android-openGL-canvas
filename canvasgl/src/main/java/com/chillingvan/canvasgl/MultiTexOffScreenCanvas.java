@@ -155,6 +155,17 @@ public abstract class MultiTexOffScreenCanvas implements GLViewRenderer {
         recycleProduceTexture();
     }
 
+    /**
+     * Force clear texture and bitmap cache of the canvas. This is not necessary needed.
+     * The canvas uses weak HashMap to reference bitmap and will recycle the texture when finalize
+     */
+    public void clearTextureCache() {
+        if (mCanvas != null) {
+            mCanvas.clearBitmapCache();
+        }
+        recycleProduceTexture();
+    }
+
     public void end() {
         if (mGLThread != null) {
             mGLThread.requestExitAndWait();
@@ -267,6 +278,7 @@ public abstract class MultiTexOffScreenCanvas implements GLViewRenderer {
         if (producedTextureTarget != GLES20.GL_TEXTURE_2D) {
             for (GLTexture glTexture : producedTextureList) {
                 glTexture.getSurfaceTexture().updateTexImage();
+                glTexture.getRawTexture().setNeedInvalidate(true);
             }
         }
         onGLDraw(mCanvas, producedTextureList, consumedTextures);

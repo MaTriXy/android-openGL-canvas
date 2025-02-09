@@ -18,7 +18,7 @@
 * 提供类似 GPUImage 里的Filter的API，可以在使用canvasGL画东西时实现图像处理。
 * 提供的View是继承 GLSurfaceView 或 TextureView 的，可以使用这两种View的特性，特别是TextureView的特性。
 
-* 另外,因为使用OpenGL在另一线程渲染，所以里面的 GLContinuousView 还提供能够实现高性能的动画的方法。
+* 另外,因为使用OpenGL在另一线程渲染，所以里面的 GLContinuousView 还提供能够实现高性能的动画的方法。（如果只要这个功能不要其它得话，那么我建议你直接继承View，见[浅析Android的canvas性能](https://www.jianshu.com/p/5a0c61c286e6)）
 ![anim](https://github.com/ChillingVan/android-openGL-canvas/raw/master/screenshots/anim-activity-example.png)
 
 
@@ -30,7 +30,7 @@
 
 
 ## 使用要求
-* Android API 14 以上(OpenGL ES 2.0 以上)
+* Android API 14 以上(OpenGL ES 2.0 以上)。 建议21以上
 
 ## 用法
 
@@ -48,7 +48,7 @@ allprojects {
 
 // module build.gradle
 dependencies {
-    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.4.0.0'
+    implementation 'com.github.ChillingVan:android-openGL-canvas:v1.5.4.0'
 }
 ```
 
@@ -126,10 +126,11 @@ public class MyGLView extends GLView {
 
 ## 注意事项和常见问题
 * 每一个View的onGLDraw都运行在自己的线程而非主线程。
-* 目前的Filter没有GPUImage里那么多，后续会陆续增加，如果有需要，参照我的代码自己实现即可，难度不高。
+* 目前的Filter没有GPUImage里那么多，如果有需要，参照我的代码自己实现即可，难度不高。
 * 为什么Bitmap修改后，再次绘制时并没更新？
 
   因为没有调用canvasGL的invalidateTextureContent(bitmap)。改变了的Bitmap需要重新绑定texture。因为绑定需要耗时，所以库里面才不做成每次都重新绑定。
+* CanvasGL里面没有drawPath或者drawText，要实现的话本库提供了IAndroidCanvasHelper，但这个只是用安卓自己的canvas生成一个Bitmap，所以要注意性能
 
 ## 相关博客文章
 * [OpenGL绘制一张图片的流程](http://www.jianshu.com/p/40521c92ef85)
@@ -139,8 +140,15 @@ public class MyGLView extends GLView {
 
 
 ## 最近更新
+* 添加高斯模糊 & 修复FilterGroup ViewPort 宽高问题（1.5.4 感谢[@iffly](https://github.com/feiyin0719)))
+* 添加录屏demo
+* 添加clearTextureCache，比弱引用更快释放内存 (1.5.2)
+* AndroidCanvasHelper能直接操作Canvas里的bitmap了 (1.5.2)
+* TwoTextureFilter支持RawTexture了
+* drawSurfaceTexture也支持BitmapMatrix了
+* 添加OrthoBitmapMatrix以支持正交投影。 默认BitmapMatrix用的是透视投影。
+* 支持裁切图片的CropFilter
 * 增加 MultiTexOffScreenCanvas, GLMultiTexProducerView, GLMultiTexConsumerView，支持提供多张纹理的和消化多张纹理
-* 增加AndroidCanvasHelper及其绘制文本的例子
 
 ## License
     Copyright 2016 ChillingVan.
@@ -152,7 +160,8 @@ public class MyGLView extends GLView {
        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
+    distributed under the License is distributed on
+     an "AS IS" BASIS,
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.

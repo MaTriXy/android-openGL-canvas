@@ -28,11 +28,11 @@ import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.util.Log;
 
-import com.chillingvan.canvasgl.util.Loggers;
 import com.chillingvan.canvasgl.shapeFilter.BasicDrawShapeFilter;
 import com.chillingvan.canvasgl.shapeFilter.DrawShapeFilter;
 import com.chillingvan.canvasgl.textureFilter.BasicTextureFilter;
 import com.chillingvan.canvasgl.textureFilter.TextureFilter;
+import com.chillingvan.canvasgl.util.Loggers;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -460,7 +460,7 @@ public class GLES20Canvas implements GLCanvas {
     @Override
     public void drawCircle(float x, float y, float radius, GLPaint paint, DrawShapeFilter drawShapeFilter) {
         setupDrawShapeFilter(drawShapeFilter);
-        draw(GLES20.GL_TRIANGLE_STRIP, OFFSET_FILL_RECT, COUNT_FILL_VERTEX, x, y, 2*radius, 2*radius, paint.getColor(), 0f);
+        draw(GLES20.GL_TRIANGLE_STRIP, OFFSET_FILL_RECT, COUNT_FILL_VERTEX, x, y, 2 * radius, 2 * radius, paint.getColor(), 0f);
     }
 
     @Override
@@ -555,15 +555,15 @@ public class GLES20Canvas implements GLCanvas {
 
     private void setMatrix(ShaderParameter[] params, float x, float y, float width, float height, ICustomMVPMatrix customMVPMatrix) {
         if (customMVPMatrix != null) {
-            GLES20.glUniformMatrix4fv(params[INDEX_MATRIX].handle, 1, false, customMVPMatrix.getMVPMatrix(mScreenWidth, mScreenHeight, x, y, width, height), 0);
+            GLES20.glUniformMatrix4fv(params[INDEX_MATRIX].handle, 1, false, customMVPMatrix.getMVPMatrix(mWidth, mHeight, x, y, width, height), 0);
             checkError();
             return;
         }
-        GLES20.glViewport(0, 0, mScreenWidth, mScreenHeight);
+        GLES20.glViewport(0, 0, mWidth, mHeight);
         Matrix.translateM(mTempMatrix, 0, mMatrices, mCurrentMatrixIndex, x, y, 0f);
         Matrix.scaleM(mTempMatrix, 0, width, height, 1f);
-//        printMatrix("translate matrix:", mTempMatrix, 0);
         Matrix.multiplyMM(mTempMatrix, MATRIX_SIZE, mProjectionMatrix, 0, mTempMatrix, 0);
+        printMatrix("translate matrix:", mTempMatrix, MATRIX_SIZE);
         GLES20.glUniformMatrix4fv(params[INDEX_MATRIX].handle, 1, false, mTempMatrix, MATRIX_SIZE);
         checkError();
     }
@@ -639,15 +639,22 @@ public class GLES20Canvas implements GLCanvas {
             onPreDrawTextureListener.onPreDraw(texture.getTarget() == GLES20.GL_TEXTURE_2D ? mTextureProgram : mOesTextureProgram, texture, mTextureFilter);
         }
         checkError();
-        if (texture.isFlippedVertically()) {
+        if (texture.isFlippedVertically() || texture.isFlippedHorizontally()) {
             save(SAVE_FLAG_MATRIX);
+        }
+        if (texture.isFlippedVertically()) {
             translate(0, target.centerY());
             scale(1, -1, 1);
             translate(0, -target.centerY());
         }
+        if (texture.isFlippedHorizontally()) {
+            translate(target.centerX(), 0);
+            scale(-1, 1, 1);
+            translate(-target.centerX(), 0);
+        }
         draw(params, GLES20.GL_TRIANGLE_STRIP, COUNT_FILL_VERTEX, target.left, target.top,
                 target.width(), target.height(), customMVPMatrix);
-        if (texture.isFlippedVertically()) {
+        if (texture.isFlippedVertically() || texture.isFlippedHorizontally()) {
             restore();
         }
         mCountTextureRect++;
@@ -989,12 +996,21 @@ public class GLES20Canvas implements GLCanvas {
             return;
         }
         StringBuilder b = new StringBuilder(message);
-        for (int i = 0; i < MATRIX_SIZE; i++) {
-            b.append(' ');
-            if (i % 4 == 0) {
-                b.append('\n');
+        b.append('\n');
+        int size = 4;
+        for (int i = 0; i < size; i++) {
+            String format = "%.6f";
+            b.append(String.format(format, m[offset + i]));
+            b.append(", ");
+            b.append(String.format(format, m[offset + 4 + i]));
+            b.append(", ");
+            b.append(String.format(format, m[offset + 8 + i]));
+            b.append(", ");
+            b.append(String.format(format, m[offset + 12 + i]));
+            if (i < size - 1) {
+                b.append(", ");
             }
-            b.append(String.format("%.6ff", m[offset + i]));
+            b.append('\n');
         }
         Loggers.v(TAG, b.toString());
     }

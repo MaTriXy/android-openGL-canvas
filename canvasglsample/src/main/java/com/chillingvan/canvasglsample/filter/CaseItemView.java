@@ -24,15 +24,19 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.chillingvan.canvasglsample.R;
-import com.chillingvan.canvasglsample.filter.adapter.CommonItemView;
+import com.chillingvan.canvasglsample.util.adapter.BaseItemView;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.OnLifecycleEvent;
 import jp.co.cyberagent.android.gpuimage.GPUImageView;
 
 /**
  * Created by Chilling on 2016/10/24.
  */
 
-public class CaseItemView implements CommonItemView<CaseEntity> {
+public class CaseItemView extends BaseItemView<CaseEntity> {
 
     private View view;
     private final FilterGLView glView;
@@ -40,10 +44,21 @@ public class CaseItemView implements CommonItemView<CaseEntity> {
     private final GPUImageView gpuImageView;
 
     public CaseItemView(View view) {
+        super(view);
         this.view = view;
         glView = (FilterGLView) view.findViewById(R.id.gl_view);
         filterNameTxt = (TextView) view.findViewById(R.id.filter_name_txt);
         gpuImageView = (GPUImageView) view.findViewById(R.id.gpu_image_view);
+        ((AppCompatActivity) view.getContext())
+                .getLifecycle()
+                .addObserver(new LifecycleObserver() {
+                    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                    public void onDestroy() {
+                        if (glView != null) {
+                            glView.clearTextureCache();
+                        }
+                    }
+                });
 
     }
 

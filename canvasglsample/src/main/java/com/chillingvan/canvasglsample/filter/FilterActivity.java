@@ -24,8 +24,6 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.ListView;
 import android.widget.SeekBar;
@@ -33,10 +31,12 @@ import android.widget.SeekBar;
 import com.chillingvan.canvasgl.textureFilter.BasicTextureFilter;
 import com.chillingvan.canvasgl.textureFilter.ColorMatrixFilter;
 import com.chillingvan.canvasgl.textureFilter.ContrastFilter;
+import com.chillingvan.canvasgl.textureFilter.CropFilter;
 import com.chillingvan.canvasgl.textureFilter.DarkenBlendFilter;
 import com.chillingvan.canvasgl.textureFilter.DirectionalSobelEdgeDetectionFilter;
 import com.chillingvan.canvasgl.textureFilter.FilterGroup;
 import com.chillingvan.canvasgl.textureFilter.GammaFilter;
+import com.chillingvan.canvasgl.textureFilter.GaussianBlurFilter;
 import com.chillingvan.canvasgl.textureFilter.HueFilter;
 import com.chillingvan.canvasgl.textureFilter.LightenBlendFilter;
 import com.chillingvan.canvasgl.textureFilter.LookupFilter;
@@ -46,7 +46,7 @@ import com.chillingvan.canvasgl.textureFilter.RGBFilter;
 import com.chillingvan.canvasgl.textureFilter.SaturationFilter;
 import com.chillingvan.canvasgl.textureFilter.TextureFilter;
 import com.chillingvan.canvasglsample.R;
-import com.chillingvan.canvasglsample.filter.adapter.CommonBaseAdapter;
+import com.chillingvan.canvasglsample.util.adapter.CommonBaseAdapter;
 
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -54,19 +54,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jp.co.cyberagent.android.gpuimage.GPUImageColorMatrixFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageContrastFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageDarkenBlendFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageDirectionalSobelEdgeDetectionFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageFilterGroup;
-import jp.co.cyberagent.android.gpuimage.GPUImageGammaFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageHueFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageLightenBlendFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageLookupFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImagePixelationFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageRGBFilter;
-import jp.co.cyberagent.android.gpuimage.GPUImageSaturationFilter;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageColorMatrixFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageContrastFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageDarkenBlendFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageDirectionalSobelEdgeDetectionFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilterGroup;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageGammaFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageGaussianBlurFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageHueFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageLightenBlendFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageLookupFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImagePixelationFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageRGBFilter;
+import jp.co.cyberagent.android.gpuimage.filter.GPUImageSaturationFilter;
 
 public class FilterActivity extends AppCompatActivity {
 
@@ -100,7 +103,6 @@ public class FilterActivity extends AppCompatActivity {
         initData();
         listView = (ListView) findViewById(R.id.filter_list);
         initSeekBar();
-
 
 
         adapter = new CommonBaseAdapter<>(renderEntityList);
@@ -144,10 +146,12 @@ public class FilterActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onStartTrackingTouch(SeekBar seekBar) { }
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
 
             @Override
-            public void onStopTrackingTouch(SeekBar seekBar) { }
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
         });
     }
 
@@ -157,6 +161,12 @@ public class FilterActivity extends AppCompatActivity {
 
         BasicTextureFilter basicTextureFilter = new BasicTextureFilter();
         renderEntityList.add(new CaseEntity(basicTextureFilter, new GPUImageFilter(), firstBitmap));
+
+
+        int width = firstBitmap.getWidth();
+        int height = firstBitmap.getHeight();
+        CropFilter cropFilter = new CropFilter(CropFilter.calc(width / 2, width), 0, 1, CropFilter.calc(height / 2, height));
+        renderEntityList.add(new CaseEntity(cropFilter, new GPUImageFilter(), firstBitmap));
 
         Bitmap lookupAmatorka = BitmapFactory.decodeResource(getResources(), R.drawable.lookup_amatorka);
         LookupFilter lookupFilter = new LookupFilter(lookupAmatorka);
@@ -226,6 +236,10 @@ public class FilterActivity extends AppCompatActivity {
         GPUImageColorMatrixFilter gpuImageColorMatrixFilter = new GPUImageColorMatrixFilter(0.3f, matrix4);
         renderEntityList.add(new CaseEntity(colorMatrixFilter, gpuImageColorMatrixFilter, firstBitmap));
 
+        GaussianBlurFilter gaussianBlurFilter = new GaussianBlurFilter(5f);
+        GPUImageGaussianBlurFilter gpuImageGaussianBlurFilter = new GPUImageGaussianBlurFilter(5f);
+        renderEntityList.add(new CaseEntity(gaussianBlurFilter, gpuImageGaussianBlurFilter, firstBitmap));
+
         return renderEntityList;
     }
 
@@ -280,7 +294,7 @@ public class FilterActivity extends AppCompatActivity {
     }
 
     public static class Range {
-        float min ;
+        float min;
         float max;
 
         public Range(float min, float max) {
@@ -289,7 +303,7 @@ public class FilterActivity extends AppCompatActivity {
         }
 
         public float value(float percentage) {
-            return min + (max - min) * (percentage /100);
+            return min + (max - min) * (percentage / 100);
         }
     }
 }

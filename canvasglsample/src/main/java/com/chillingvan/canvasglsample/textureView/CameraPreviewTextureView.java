@@ -22,15 +22,16 @@ package com.chillingvan.canvasglsample.textureView;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 
 import com.chillingvan.canvasgl.ICanvasGL;
-import com.chillingvan.canvasgl.glcanvas.BasicTexture;
 import com.chillingvan.canvasgl.glcanvas.RawTexture;
 import com.chillingvan.canvasgl.glview.texture.GLSurfaceTextureProducerView;
+import com.chillingvan.canvasgl.glview.texture.GLTexture;
 import com.chillingvan.canvasgl.textureFilter.BasicTextureFilter;
 import com.chillingvan.canvasgl.textureFilter.TextureFilter;
+
+import androidx.annotation.Nullable;
 
 /**
  * Created by Chilling on 2016/11/3.
@@ -39,6 +40,7 @@ import com.chillingvan.canvasgl.textureFilter.TextureFilter;
 public class CameraPreviewTextureView extends GLSurfaceTextureProducerView {
 
     private TextureFilter textureFilter = new BasicTextureFilter();
+    private int mRotation = 0;
 
     public CameraPreviewTextureView(Context context) {
         super(context);
@@ -62,7 +64,21 @@ public class CameraPreviewTextureView extends GLSurfaceTextureProducerView {
     }
 
     @Override
-    protected void onGLDraw(ICanvasGL canvas, SurfaceTexture producedSurfaceTexture, RawTexture producedRawTexture, @Nullable SurfaceTexture sharedSurfaceTexture, @Nullable BasicTexture sharedTexture) {
+    protected void onGLDraw(ICanvasGL canvas, GLTexture producedGLTexture, @Nullable GLTexture outsideGLTexture) {
+        super.onGLDraw(canvas, producedGLTexture, outsideGLTexture);
+        canvas.save();
+        RawTexture producedRawTexture = producedGLTexture.getRawTexture();
+        SurfaceTexture producedSurfaceTexture = producedGLTexture.getSurfaceTexture();
+        // note the rotate center point.
+        canvas.rotate(mRotation, getWidth() / 2f, getHeight() / 2f);
         canvas.drawSurfaceTexture(producedRawTexture, producedSurfaceTexture, 0, 0, producedRawTexture.getWidth(), producedRawTexture.getHeight(), textureFilter);
+        canvas.restore();
+    }
+
+    public void rotateSurface(int rotation) {
+        mRotation += rotation;
+        if (mRotation >= 360) {
+            mRotation = 0;
+        }
     }
 }

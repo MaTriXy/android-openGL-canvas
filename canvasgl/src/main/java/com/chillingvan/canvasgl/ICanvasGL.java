@@ -26,9 +26,6 @@ import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
-import android.support.annotation.IntRange;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 
 import com.chillingvan.canvasgl.glcanvas.BasicTexture;
 import com.chillingvan.canvasgl.glcanvas.BitmapTexture;
@@ -36,9 +33,13 @@ import com.chillingvan.canvasgl.glcanvas.GLCanvas;
 import com.chillingvan.canvasgl.glcanvas.GLES20Canvas;
 import com.chillingvan.canvasgl.glcanvas.GLPaint;
 import com.chillingvan.canvasgl.glcanvas.RawTexture;
+import com.chillingvan.canvasgl.matrix.BaseBitmapMatrix;
+import com.chillingvan.canvasgl.matrix.IBitmapMatrix;
 import com.chillingvan.canvasgl.textureFilter.TextureFilter;
 
-import java.util.Arrays;
+import androidx.annotation.IntRange;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * Created by Matthew on 2016/9/26.
@@ -47,6 +48,8 @@ import java.util.Arrays;
 public interface ICanvasGL {
 
     BitmapTexture bindBitmapToTexture(int whichTexture, Bitmap bitmap);
+
+    void bindRawTexture(int whichTexture, RawTexture texture);
 
     void beginRenderTarget(RawTexture texture);
 
@@ -58,9 +61,15 @@ public interface ICanvasGL {
 
     void drawSurfaceTexture(BasicTexture texture, @Nullable SurfaceTexture surfaceTexture, int left, int top, int right, int bottom, TextureFilter textureFilter);
 
-    void drawBitmap(Bitmap bitmap, @NonNull CanvasGL.BitmapMatrix matrix);
+    void drawSurfaceTexture(BasicTexture texture, @Nullable SurfaceTexture surfaceTexture, @NonNull IBitmapMatrix matrix);
 
-    void drawBitmap(Bitmap bitmap, CanvasGL.BitmapMatrix matrix, @NonNull TextureFilter textureFilter);
+    void drawSurfaceTexture(BasicTexture texture, @Nullable SurfaceTexture surfaceTexture, @NonNull IBitmapMatrix matrix, @NonNull TextureFilter textureFilter);
+
+    void drawSurfaceTexture(BasicTexture texture, SurfaceTexture surfaceTexture, int left, int top, int right, int bottom, @NonNull IBitmapMatrix matrix, TextureFilter textureFilter);
+
+    void drawBitmap(Bitmap bitmap, @NonNull IBitmapMatrix matrix);
+
+    void drawBitmap(Bitmap bitmap, IBitmapMatrix matrix, @NonNull TextureFilter textureFilter);
 
     void drawBitmap(Bitmap bitmap, Rect src, RectF dst);
 
@@ -117,6 +126,16 @@ public interface ICanvasGL {
 
     int getHeight();
 
+    void resume();
+
+    void pause();
+
+    /**
+     * Force clear texture and bitmap cache of the canvas. This is not necessary needed.
+     * The canvas uses weak HashMap to reference bitmap and will recycle the texture when finalize
+     */
+    void clearBitmapCache();
+
     /**
      * If used in a texture view, make sure the setOpaque(false) is called.
      *
@@ -124,50 +143,19 @@ public interface ICanvasGL {
      */
     void setAlpha(@IntRange(from = 0, to = 255) int alpha);
 
+
     /**
-     * Created by Chilling on 2017/8/19.
+     * Default bitmap matrix. It uses perspective projection type. So it can have 3D feel. As a result, rotate around X, rotate around Y, rotate around Z are supported.
      */
-    class BitmapMatrix {
-        public static final int TRANSLATE_X = 0;
-        public static final int TRANSLATE_Y = 1;
-        public static final int SCALE_X = 2;
-        public static final int SCALE_Y = 3;
-        public static final int ROTATE_X = 4;
-        public static final int ROTATE_Y = 5;
-        public static final int ROTATE_Z = 6;
-        private float[] transform = new float[7];
+    class BitmapMatrix extends BaseBitmapMatrix {
 
-        public static final int MATRIX_SIZE = 16;
-
-        private float[] tempMultiplyMatrix4 = new float[MATRIX_SIZE];
-
-        private float[] mViewMatrix = new float[MATRIX_SIZE];
-        private float[] mProjectionMatrix = new float[MATRIX_SIZE];
-        private float[] mModelMatrix = new float[MATRIX_SIZE];
-        private float[] viewProjectionMatrix = new float[MATRIX_SIZE];
-        private float[] mvp = new float[MATRIX_SIZE];
-
-        final static float NEAR = 1;
-        final static float FAR = 10;
-        final static float EYEZ = 5;
-        final static float Z_RATIO = (FAR + NEAR) / 2 / NEAR;
-
+        private final int maxViewPortInt;
 
         public BitmapMatrix() {
             reset();
-        }
-
-        public void reset() {
-            Matrix.setIdentityM(mViewMatrix, 0);
-            Matrix.setIdentityM(mProjectionMatrix, 0);
-            Matrix.setIdentityM(mModelMatrix, 0);
-            Matrix.setIdentityM(viewProjectionMatrix, 0);
-            Matrix.setIdentityM(mvp, 0);
-
-            Matrix.setIdentityM(tempMultiplyMatrix4, 0);
-            Arrays.fill(transform, 0);
-            transform[SCALE_X] = 1;
-            transform[SCALE_Y] = 1;
+            int[] maxViewPort = new int[1];
+            GLES20.glGetIntegerv(GLES20.GL_MAX_VIEWPORT_DIMS, maxViewPort, 0);
+            maxViewPortInt = maxViewPort[0];
         }
 
         public void translate(float dx, float dy) {
@@ -175,6 +163,11 @@ public interface ICanvasGL {
             transform[TRANSLATE_Y] += dy;
         }
 
+        /**
+         * Should not be larger than 2 * GLES20.GL_MAX_VIEWPORT_DIMS
+         * @param sx
+         * @param sy
+         */
         public void scale(float sx, float sy) {
             transform[SCALE_X] *= sx;
             transform[SCALE_Y] *= sy;
@@ -192,16 +185,25 @@ public interface ICanvasGL {
             transform[ROTATE_Z] += degrees;
         }
 
+        @Override
         public float[] obtainResultMatrix(int viewportW, int viewportH, float x, float y, float drawW, float drawH) {
-
-            float ratio = (float) viewportW / viewportH;
 
             transform[TRANSLATE_X] += x;
             transform[TRANSLATE_Y] += y;
-
-            int viewportX = (int) (drawW / 2 - viewportW + transform[TRANSLATE_X]);
-            int viewportY = (int) (-drawH / 2 - transform[TRANSLATE_Y]);
-            GLES20.glViewport(viewportX, viewportY, 2 * viewportW, 2 * viewportH);
+            // The ratio is used to make sure the openGL view port contain the origin view port, so that the picture won't be cropped.
+            // double viewport size is enough to include the origin view port
+            int viewPortRatio = 2;
+            // Move view port to make sure the picture in the center of the view port.
+            final float absTransX = Math.abs(transform[TRANSLATE_X]); // Make sure viewportX + realViewportW includes viewportW
+            final float absTransY = Math.abs(transform[TRANSLATE_Y]); // Make sure realViewportH - viewportY includes viewportH
+            int realViewportW = (int) (viewPortRatio * viewportW + 2*absTransX);
+            int realViewportH = (int) (viewPortRatio * viewportH + 2*absTransY);
+            realViewportW = Math.min(realViewportW, maxViewPortInt);
+            realViewportH = Math.min(realViewportH, maxViewPortInt);
+            int viewportX = (int) (drawW / 2 - realViewportW / 2 + transform[TRANSLATE_X]);
+            int viewportY = (int) (-drawH / 2 - transform[TRANSLATE_Y] - realViewportH / 2 + viewportH);
+            GLES20.glViewport(viewportX, viewportY, realViewportW, realViewportH);
+            float ratio = (float) realViewportW / realViewportH;
 
             Matrix.frustumM(mProjectionMatrix, 0, -ratio, ratio, -1, 1, NEAR, FAR);
             Matrix.setLookAtM(mViewMatrix, 0,
@@ -209,24 +211,94 @@ public interface ICanvasGL {
                     0, 0, 0,
                     0, 1, 0);
             Matrix.multiplyMM(viewProjectionMatrix, 0, mProjectionMatrix, 0, mViewMatrix, 0);
-            Matrix.scaleM(mModelMatrix, 0, 1, -1, 1);
-            GLES20Canvas.printMatrix("model -2:", mModelMatrix, 0);
 
+            // reverse Y
+            Matrix.scaleM(mModelMatrix, 0, 1, -1, 1);
+            GLES20Canvas.printMatrix("model init:", mModelMatrix, 0);
 
             Matrix.rotateM(mModelMatrix, 0, transform[ROTATE_X], 1f, 0, 0);
             Matrix.rotateM(mModelMatrix, 0, transform[ROTATE_Y], 0, 1f, 0);
             Matrix.rotateM(mModelMatrix, 0, transform[ROTATE_Z], 0, 0, 1f);
-            GLES20Canvas.printMatrix("model -1.5:", mModelMatrix, 0);
+            GLES20Canvas.printMatrix("model rotated:", mModelMatrix, 0);
 
+            // Translate to the middleZ of the projection
+            // realW,realH are the w,h in the middleZ of the projection
+            float realW = (2 * ratio) * drawW / realViewportW * Z_RATIO;
+            float realH = 2 * drawH / realViewportH * Z_RATIO;
 
-            float realW = drawW / viewportW * Z_RATIO * 2 * ratio / 2;
-            float realH = drawH / viewportH * Z_RATIO * 2 / 2;
+            // Need to make X, Y to the middleZ of the plane, too. The middleZ of the plane is (0, 0, -Z_RATIO + EYEZ)
             Matrix.translateM(tempMultiplyMatrix4, 0, mModelMatrix, 0, -realW/2, -realH/2, -Z_RATIO + EYEZ);
-            GLES20Canvas.printMatrix("model -1:", tempMultiplyMatrix4, 0);
-
+            GLES20Canvas.printMatrix("model translated:", tempMultiplyMatrix4, 0);
 
             Matrix.scaleM(tempMultiplyMatrix4, 0, transform[SCALE_X] * realW, transform[SCALE_Y] * realH, 1);
-            GLES20Canvas.printMatrix("model:", tempMultiplyMatrix4, 0);
+            GLES20Canvas.printMatrix("model scaled:", tempMultiplyMatrix4, 0);
+
+
+            Matrix.multiplyMM(mvp, 0, viewProjectionMatrix, 0, tempMultiplyMatrix4, 0);
+            GLES20Canvas.printMatrix("ultra matrix:", mvp, 0);
+
+            return mvp;
+        }
+
+    }
+
+
+
+    /**
+     * Orthographic bitmap matrix. It uses orthographic projection type. So it only support rotate around Z
+     */
+    class OrthoBitmapMatrix extends BaseBitmapMatrix {
+
+        public OrthoBitmapMatrix() {
+            reset();
+        }
+
+
+        public void translate(float dx, float dy) {
+            transform[TRANSLATE_X] += dx;
+            transform[TRANSLATE_Y] += dy;
+        }
+
+        public void scale(float sx, float sy) {
+            transform[SCALE_X] *= sx;
+            transform[SCALE_Y] *= sy;
+        }
+
+        /**
+         * The center x, y is the center of the view port
+         * @param degrees
+         */
+        public void rotateZ(float degrees) {
+            transform[ROTATE_Z] += degrees;
+        }
+
+        @Override
+        public float[] obtainResultMatrix(int viewportW, int viewportH, float x, float y, float drawW, float drawH) {
+            float ratio = (float) viewportW / viewportH;
+
+            transform[TRANSLATE_X] += x;
+            transform[TRANSLATE_Y] += y;
+
+            GLES20.glViewport(0, 0, viewportW, viewportH);
+
+            Matrix.orthoM(mProjectionMatrix, 0, 0, ratio, 0, 1, -1, 1);
+            Matrix.multiplyMM(viewProjectionMatrix, 0, mProjectionMatrix, 0, mViewMatrix, 0);
+
+            Matrix.scaleM(mModelMatrix, 0, 1, -1, 1);
+            GLES20Canvas.printMatrix("model init:", mModelMatrix, 0);
+
+            Matrix.rotateM(mModelMatrix, 0, transform[ROTATE_Z], 0, 0, 1f);
+            GLES20Canvas.printMatrix("model rotated:", mModelMatrix, 0);
+
+
+            final float transX = transform[TRANSLATE_X] / viewportW;
+            final float transY = transform[TRANSLATE_Y] / viewportH -1;
+            Matrix.translateM(tempMultiplyMatrix4, 0, mModelMatrix, 0, transX, transY, 0);
+            GLES20Canvas.printMatrix("model translated:", tempMultiplyMatrix4, 0);
+
+            Matrix.scaleM(tempMultiplyMatrix4, 0, transform[SCALE_X] * drawW/viewportW * ratio, transform[SCALE_Y] * drawH/viewportH, 1);
+            GLES20Canvas.printMatrix("model scaled:", tempMultiplyMatrix4, 0);
+
 
             Matrix.multiplyMM(mvp, 0, viewProjectionMatrix, 0, tempMultiplyMatrix4, 0);
             GLES20Canvas.printMatrix("ultra matrix:", mvp, 0);

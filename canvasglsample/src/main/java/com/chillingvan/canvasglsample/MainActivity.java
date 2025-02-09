@@ -31,9 +31,6 @@ import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.Toast;
 
-import com.chillingvan.canvasgl.util.FileLogger;
-import com.chillingvan.canvasgl.util.Loggers;
-
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,10 +52,7 @@ public class MainActivity extends ListActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FileLogger.init(getExternalFilesDir(null).getAbsolutePath());
-        FileLogger.d("MainActivity", "init -----------------");
         CrashHandler.init(getApplicationContext());
-        Loggers.DEBUG = true;
         getPermission();
 
         Intent intent = getIntent();
@@ -79,23 +73,23 @@ public class MainActivity extends ListActivity {
     }
 
     private void getPermission() {
-        Nammu.init(getApplicationContext());
+        Nammu.INSTANCE.init(getApplicationContext());
         askPermission(Manifest.permission.CAMERA);
         askPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE);
     }
 
     private void askPermission(String permissionName) {
-        if (!Nammu.checkPermission(permissionName)) {
-            if (Nammu.shouldShowRequestPermissionRationale(this, permissionName)) {
+        if (!Nammu.INSTANCE.checkPermission(permissionName)) {
+            if (Nammu.INSTANCE.shouldShowRequestPermissionRationale(this, permissionName)) {
                 Toast.makeText(this, R.string.permission_tips, Toast.LENGTH_SHORT).show();
-                Nammu.askForPermission(MainActivity.this, permissionName, new PermissionCallback() {
+                Nammu.INSTANCE.askForPermission(MainActivity.this, permissionName, new PermissionCallback() {
                     @Override
                     public void permissionGranted() { }
                     @Override
                     public void permissionRefused() { }
                 });
             } else {
-                Nammu.askForPermission(MainActivity.this, permissionName, new PermissionCallback() {
+                Nammu.INSTANCE.askForPermission(MainActivity.this, permissionName, new PermissionCallback() {
                     @Override
                     public void permissionGranted() { }
                     @Override

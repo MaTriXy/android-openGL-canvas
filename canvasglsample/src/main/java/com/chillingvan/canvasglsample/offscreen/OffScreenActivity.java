@@ -28,7 +28,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.widget.ImageView;
 
 import com.chillingvan.canvasgl.ICanvasGL;
@@ -45,6 +45,7 @@ import com.chillingvan.canvasglsample.R;
 public class OffScreenActivity extends Activity {
 
     private ImageView imageView;
+    private OffScreenCanvas offScreenCanvas;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +54,7 @@ public class OffScreenActivity extends Activity {
 
         imageView = (ImageView) findViewById(R.id.off_screen_img_v);
 
-        final OffScreenCanvas offScreenCanvas = new OffScreenCanvas(400, 400) {
+        offScreenCanvas = new OffScreenCanvas(400, 400) {
             @Override
             protected void onGLDraw(ICanvasGL canvas, SurfaceTexture producedSurfaceTexture, RawTexture producedRawTexture, SurfaceTexture outsideSharedSurfaceTexture, BasicTexture outsideSharedTexture) {
                 canvas.beginRenderTarget(producedRawTexture);
@@ -104,5 +105,16 @@ public class OffScreenActivity extends Activity {
 
 
         offScreenCanvas.start();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        offScreenCanvas.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 }
